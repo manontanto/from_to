@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+# from_to 
+#
+# manontanto
+'''
+日本に割り当てられたiPのリストで、与えられたIPがどの隙間に該当するかを応える
+これは、不適切なコンタクトを発見した時に、FireWallにセットするiP(CIDR)を示すもの
+表示されるのは、
+
+BAN > 侵入者
+  日本に割り当てられていないiP群
+  日本に割り当てられていないiP群
+  ... 
+
+'''
+import sys
+import ipaddress
+import netaddr
+import pyperclip
+
+IpList = '/PATH/TO/日本のiplist.txt'
+
+def convip(ipString):
+    sl0 = ipString.split('/') # ip string list
+    sl = sl0[0].split('.')
+    sf0 = [ '00' + l for l in sl ] # STEP 0: add '00' to each ip
+    sf1 = [ ll[-3:] for ll in sf0 ] #STEP 1: get each 3 left dig.
+    return f'{sf1[0]}.{sf1[1]}.{sf1[2]}.{sf1[3]}/{sl0[1]}'
+    
+def main():
+    arg = len(sys.argv)
+    if arg == 1:
+        search_ip = pyperclip.paste() 
+    elif arg == 2:
+        search_ip = sys.argv[1]
+    else:
+        sys.exit('from_to [ip]')
+
+#    search_ip = '109.237.103.038'
+    from_to = open( IpList, 'r' )
+    contents = [s.strip() for s in from_to.readlines()]
+    for ips in contents:
+        if '#' in ips:
+            continue
+        f_t = ips.split('-')    # FROM-TO
+        if search_ip < f_t[0]:  # FROM ip(left row)
+            print('BAN > ', search_ip)
+            from_ip = str(ipaddress.IPv4Address(last_toip) + 1 )
+            to_ip = str(ipaddress.IPv4Address(f_t[0]) - 1 )
+            # make CIDRs
+            cidrs = netaddr.iprange_to_cidrs(from_ip, to_ip)
+            for i in cidrs:
+                print('  ' + convip(str(i)))
+            break
+        last_toip = f_t[1] # TO ip(right row)
+
+if __name__ == '__main__':
+    main()
