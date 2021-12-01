@@ -5,8 +5,9 @@
 '''
 日本に割り当てられたiPのリストで、与えられたIPがどの隙間に該当するかを応える
 これは、不適切なコンタクトを発見した時に、FireWallにセットするiP(CIDR)を示すもの
-表示されるのは、
+割り当て表は、2021-11-20 13:00:00 に出力したものを使用している
 
+表示されるのは、
 BAN > 侵入者
   日本に割り当てられていないiP群
   日本に割り当てられていないiP群
@@ -19,6 +20,8 @@ import netaddr
 import pyperclip
 
 IpList = '/PATH/TO/日本のiplist.txt'
+Jp_start_v4 = ipaddress.IPv4Address('1.0.16.0')      # 表の最初のiP
+Jp_last_v4 =ipaddress.IPv4Address('223.252.127.255') # 表の最後のiP
 
 def convip(ipString):
     sl0 = ipString.split('/') # ip string list
@@ -27,6 +30,10 @@ def convip(ipString):
     sf1 = [ ll[-3:] for ll in sf0 ] #STEP 1: get each 3 left dig.
     return f'{sf1[0]}.{sf1[1]}.{sf1[2]}.{sf1[3]}/{sl0[1]}'
     
+def print_cidrs(c):
+    for i in c:
+        print('  ' + convip(str(i)))
+
 def main():
     arg = len(sys.argv)
     if arg == 1:
@@ -37,22 +44,40 @@ def main():
         sys.exit('from_to [ip]')
 
 #    search_ip = '109.237.103.038'
+    search_v4 = ipaddress.IPv4Address(search_ip)
     from_to = open( IpList, 'r' )
     contents = [s.strip() for s in from_to.readlines()]
+    last_to_v4 = ipaddress.IPv4Address('0.0.0.0')
     for ips in contents:
         if '#' in ips:
             continue
         f_t = ips.split('-')    # FROM-TO
-        if search_ip < f_t[0]:  # FROM ip(left row)
+        f_v4 = ipaddress.IPv4Address(f_t[0])
+        t_v4 = ipaddress.IPv4Address(f_t[1])
+        if search_v4 < Jp_start_v4:  # 表より前
+            cidrs = netaddr.iprange_to_cidrs('0.0.0.0', str(Jp_start_v4 - 1))
+            print_cidrs(cidrs)
+            sys.exit()
+
+        if search_v4 > Jp_last_v4:  # 表より後
+            cidrs = netaddr.iprange_to_cidrs(str(Jp_last_v4 + 1), '255.255.255.255')
+            print_cidrs(cidrs)
+            sys.exit()
+
+        if f_v4 < search_v4 and search_v4 < t_v4:  # 日本のiP
+            print(f"IP: [{search_v4}] は日本に割り当てられているiPです.")
+            sys.exit()
+
+        if search_v4 < f_v4:  # v4 of FROM ip(left row)
             print('BAN > ', search_ip)
-            from_ip = str(ipaddress.IPv4Address(last_toip) + 1 )
-            to_ip = str(ipaddress.IPv4Address(f_t[0]) - 1 )
+            from_ip = str(last_to_v4 + 1 )
+            to_ip = str(f_v4 - 1 )
             # make CIDRs
             cidrs = netaddr.iprange_to_cidrs(from_ip, to_ip)
-            for i in cidrs:
-                print('  ' + convip(str(i)))
+            print_cidrs(cidrs)
             break
-        last_toip = f_t[1] # TO ip(right row)
+
+        last_to_v4 = ipaddress.IPv4Address(f_t[1]) # TO ip(right row)
 
 if __name__ == '__main__':
     main()
